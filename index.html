@@ -1,0 +1,46 @@
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Olive OS - Live Dashboard</title>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript">
+      google.charts.load('current', {'packages':['table']});
+      google.charts.setOnLoadCallback(drawTable);
+
+      function drawTable() {
+        const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-vRAdDwX9qitwUOes0kHJDH7s1Xi35zEnjtNxvaAP2nz4vtYW3w35GFkaYN9uWg/pub?output=csv";
+
+        fetch(url)
+          .then(response => response.text())
+          .then(csv => {
+            const rows = csv.split('\n').map(r => r.split(','));
+            const data = new google.visualization.DataTable();
+
+            rows[0].forEach(header => data.addColumn('string', header));
+            for (let i = 1; i < rows.length; i++) {
+              if (rows[i].length === rows[0].length) {
+                data.addRow(rows[i]);
+              }
+            }
+
+            const table = new google.visualization.Table(document.getElementById('dashboard'));
+            table.draw(data, {showRowNumber: true, width: '100%', height: '100%'});
+          })
+          .catch(err => {
+            document.getElementById('dashboard').innerHTML = 'Failed to load data: ' + err;
+          });
+      }
+    </script>
+    <style>
+      body { font-family: Arial, sans-serif; padding: 20px; background-color: #f9f9f9; }
+      h1 { color: #2c3e50; text-align: center; }
+      #dashboard { margin-top: 30px; }
+    </style>
+  </head>
+  <body>
+    <h1>Olive OS - Live Dashboard</h1>
+    <div id="dashboard">Loading data...</div>
+  </body>
+</html>
