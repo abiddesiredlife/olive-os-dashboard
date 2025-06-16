@@ -1,26 +1,215 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
   <title>Olive OS – Live Dashboard</title>
-  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f4f9f6;
+      color: #222;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: #006442;
+      color: white;
+      padding: 1rem;
+      text-align: center;
+      font-size: 1.8rem;
+      font-weight: bold;
+    }
+    .container {
+      padding: 2rem;
+    }
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      align-items: center;
+    }
+    select, input[type="checkbox"] {
+      padding: 0.5rem;
+      font-size: 1rem;
+    }
+    label {
+      margin-right: 1rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    th, td {
+      padding: 0.7rem;
+      border: 1px solid #ccc;
+      text-align: center;
+    }
+    th {
+      background-color: #e2f0e9;
+    }
+    .highlight-red {
+      color: #b30000;
+      font-weight: bold;
+    }
+    .summary {
+      margin-top: 1rem;
+      font-size: 1.1rem;
+      background: #f0fff8;
+      padding: 1rem;
+      border-left: 5px solid #006442;
+    }
+  </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Olive OS – Live Dashboard</h1>
-    <div class="controls">
-      <label><input type="radio" name="view" value="customer" checked> Customer-wise</label>
-      <label><input type="radio" name="view" value="region"> Region-wise</label>
-      <select id="selector"><option value="">--Select--</option></select>
-    </div>
-    <div class="summary" id="summary">Loading...</div>
-    <table id="dataTable">
-      <thead>
-        <tr><th>S.No</th><th>Customer</th><th>Region</th><th>Inv No</th>
-        <th>Date</th><th>Days</th><th>Invoice (₹)</th><th>Pending (₹)</th><th>Status</th></tr>
-      </thead><tbody></tbody>
-    </table>
+
+<header>Olive OS – Live Dashboard</header>
+<div class="container">
+  <div class="filters">
+    <label><input type="checkbox" id="filterCustomer"> Customer wise</label>
+    <label><input type="checkbox" id="filterRegion"> Region wise</label>
+    <select id="selector"><option>Select Name</option></select>
   </div>
-  <script src="script.js"></script>
+
+  <div class="summary" id="summary"></div>
+  <table id="data-table">
+    <thead>
+      <tr>
+        <th>S.No.</th>
+        <th>Name of the customer</th>
+        <th>Place</th>
+        <th>Inv. No.</th>
+        <th>Inv. Date</th>
+        <th>DAYS OF INVOICE</th>
+        <th>Invoice Value (₹)</th>
+        <th>Amount Pending (₹)</th>
+        <th>Status</th>
+        <th>DSO</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+  const sheetURL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-vRAdDwX9qitwUOes0kHJDH7s1Xi35zEnjtNxvaAP2nz4vtYW3w35GFkaYN9uWg/pub?output=csv';
+
+  async function fetchData() {
+    const res = await fetch(sheetURL);
+    const csv = await res.text();
+    const rows = csv.split('\n').map(row => row.split(','));
+    const headers = rows.shift();
+    return rows.map(row => {
+      const obj = {};
+      headers.forEach((h, i) => {
+        obj[h.trim()] = row[i]?.trim();
+      });
+      return obj;
+    });
+  }
+
+  function getUnique(arr, key) {
+    return [...new Set(arr.map(item => item[key]))].filter(Boolean);
+  }
+
+  function calculateDSO(days, amountPending) {
+    const amt = parseFloat(amountPending || '0');
+    const day = parseInt(days || '0');
+    return amt > 0 ? (amt / (day || 1)).toFixed(2) : '0.00';
+  }
+
+  function displayData(data, filterKey = null, filterValue = null) {
+    const tbody = document.querySelector('#data-table tbody');
+    const summary = document.getElementById('summary');
+    tbody.innerHTML = '';
+    let totalInvoice = 0, totalPending = 0, over90 = 0, over60 = 0;
+
+    const filtered = filterKey ? data.filter(d => d[filterKey] === filterValue) : data;
+
+    filtered.forEach((row, idx) => {
+      const invoice = parseFloat(row['Invoice Value']) || 0;
+      const pending = parseFloat(row['Amount Pending']) || 0;
+      const days = parseInt(row['DAYS OF INVOICE']) || 0;
+      const dso = calculateDSO(days, pending);
+      totalInvoice += invoice;
+      totalPending += pending;
+
+      if (days >= 90) over90 += pending;
+      else if (days >= 60) over60 += pending;
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${idx + 1}</td>
+        <td>${row['Name of the customer']}</td>
+        <td>${row['Place']}</td>
+        <td>${row['Inv. No.']}</td>
+        <td>${row['Inv. Date']}</td>
+        <td>${days}</td>
+        <td>₹${invoice.toLocaleString()}</td>
+        <td class="${days >= 90 ? 'highlight-red' : ''}">₹${pending.toLocaleString()}</td>
+        <td>${row['STATUS'] || ''}</td>
+        <td>${dso}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    summary.innerHTML = `
+      <strong>Total Invoice Value:</strong> ₹${totalInvoice.toLocaleString()} &nbsp;&nbsp; | 
+      <strong>Total Outstanding:</strong> ₹${totalPending.toLocaleString()}<br>
+      <strong>60-90 Days OS:</strong> ₹${over60.toLocaleString()} &nbsp;&nbsp; | 
+      <strong>90+ Days OS:</strong> <span class="highlight-red">₹${over90.toLocaleString()}</span>
+    `;
+  }
+
+  async function initDashboard() {
+    const data = await fetchData();
+    const selector = document.getElementById('selector');
+    const custBox = document.getElementById('filterCustomer');
+    const regBox = document.getElementById('filterRegion');
+
+    let filterKey = '';
+    let filterValues = [];
+
+    function refreshSelector() {
+      selector.innerHTML = '<option>Select Name</option>';
+      filterValues = getUnique(data, filterKey);
+      filterValues.forEach(val => {
+        const opt = document.createElement('option');
+        opt.value = val;
+        opt.textContent = val;
+        selector.appendChild(opt);
+      });
+    }
+
+    custBox.addEventListener('change', () => {
+      if (custBox.checked) {
+        regBox.checked = false;
+        filterKey = 'Name of the customer';
+        refreshSelector();
+      }
+    });
+
+    regBox.addEventListener('change', () => {
+      if (regBox.checked) {
+        custBox.checked = false;
+        filterKey = 'Place';
+        refreshSelector();
+      }
+    });
+
+    selector.addEventListener('change', () => {
+      if (selector.value !== 'Select Name') {
+        displayData(data, filterKey, selector.value);
+      }
+    });
+
+    // Default
+    displayData(data);
+  }
+
+  initDashboard();
+</script>
+
 </body>
 </html>
