@@ -1,183 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Olive OS – Live Dashboard</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background-color: #fdfdfb;
-      margin: 0;
-      padding: 0;
-      color: #333;
-    }
-
-    header {
-      background-color: #2e7d32;
-      padding: 1rem;
-      text-align: center;
-      color: white;
-    }
-
-    .logo {
-      max-width: 100px;
-      display: block;
-      margin: 10px auto;
-    }
-
-    h1 {
-      margin: 0.2rem;
-      font-size: 1.5rem;
-    }
-
-    .filters {
-      display: flex;
-      justify-content: center;
-      gap: 1rem;
-      padding: 1rem;
-    }
-
-    .summary {
-      background: #e8f5e9;
-      padding: 1.2rem;
-      text-align: center;
-      font-size: 1.2rem;
-      line-height: 1.8rem;
-    }
-
-    .summary .danger {
-      color: darkred;
-      font-weight: bold;
-    }
-
-    table {
-      width: 95%;
-      margin: 1rem auto;
-      border-collapse: collapse;
-      font-size: 0.95rem;
-    }
-
-    th, td {
-      border: 1px solid #ccc;
-      padding: 0.5rem;
-      text-align: center;
-    }
-
-    th {
-      background-color: #a5d6a7;
-    }
-
-    .red-text {
-      color: darkred;
-      font-weight: bold;
-    }
-
-    .hidden {
-      display: none;
-    }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-  <header>
-    <img src="logo-poultry.png" alt="Poultry Logo" class="logo" />
+  <div class="container">
     <h1>Olive OS – Live Dashboard</h1>
-  </header>
-
-  <div class="filters">
-    <label><input type="checkbox" id="customerWise" /> Customer wise</label>
-    <label>
-      Region wise:
-      <select id="regionFilter">
-        <option value="All">All</option>
-        <option value="RM-HYDERABAD">RM-HYDERABAD</option>
-        <option value="Vijayawada">Vijayawada</option>
-        <option value="Karimnagar">Karimnagar</option>
-        <option value="Tanuku">Tanuku</option>
-        <option value="Hyderabad">Hyderabad</option>
-      </select>
-    </label>
+    <div class="controls">
+      <label><input type="radio" name="view" value="customer" checked> Customer-wise</label>
+      <label><input type="radio" name="view" value="region"> Region-wise</label>
+      <select id="selector"><option value="">--Select--</option></select>
+    </div>
+    <div class="summary" id="summary">Loading...</div>
+    <table id="dataTable">
+      <thead>
+        <tr><th>S.No</th><th>Customer</th><th>Region</th><th>Inv No</th>
+        <th>Date</th><th>Days</th><th>Invoice (₹)</th><th>Pending (₹)</th><th>Status</th></tr>
+      </thead><tbody></tbody>
+    </table>
   </div>
-
-  <div class="summary" id="summary">
-    Loading summary...
-  </div>
-
-  <table id="data-table">
-    <thead>
-      <tr>
-        <th>S.No</th>
-        <th>Name of the Customer</th>
-        <th>Place</th>
-        <th>Inv. No</th>
-        <th>Inv. Date</th>
-        <th>DAYS OF INVOICE</th>
-        <th>Invoice Value (₹)</th>
-        <th>Amount Pending (₹)</th>
-        <th>Status</th>
-        <th>DSO</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-
-  <script>
-    const dataUrl = 'data.csv'; // ← link to your data CSV file
-
-    async function loadData() {
-      const res = await fetch(dataUrl);
-      const text = await res.text();
-      const rows = text.trim().split('\n').slice(1).map(r => r.split(','));
-
-      const tbody = document.querySelector("#data-table tbody");
-      let totalInvoice = 0, totalPending = 0;
-      let os60to90 = 0, os90 = 0;
-
-      tbody.innerHTML = "";
-
-      rows.forEach((row, index) => {
-        const [sno, name, place, invNo, invDate, days, invoice, pending, status, dsoVal] = row;
-        const invoiceValue = parseFloat(invoice.replace(/[^0-9.]/g, '')) || 0;
-        const amountPending = parseFloat(pending.replace(/[^0-9.]/g, '')) || 0;
-        const daysNum = parseInt(days);
-
-        totalInvoice += invoiceValue;
-        totalPending += amountPending;
-
-        if (daysNum >= 60 && daysNum <= 90) os60to90 += amountPending;
-        if (daysNum > 90) os90 += amountPending;
-
-        const tr = document.createElement("tr");
-        const td = (v) => `<td>${v}</td>`;
-        const red = daysNum > 90 && amountPending > 0;
-
-        tr.innerHTML = `
-          ${td(index + 1)}
-          ${td(name)}
-          ${td(place)}
-          ${td(invNo)}
-          ${td(invDate)}
-          ${td(days)}
-          ${td(`₹${invoice}`)}
-          ${red ? `<td class="red-text">₹${pending}</td>` : td(`₹${pending}`)}
-          ${td(status)}
-          ${td(((amountPending / totalInvoice) * 365).toFixed(2))}
-        `;
-        tbody.appendChild(tr);
-      });
-
-      const dso = ((totalPending / totalInvoice) * 365).toFixed(2);
-      document.querySelector("#summary").innerHTML = `
-        <div><strong>Total Invoice Value:</strong> ₹${totalInvoice.toLocaleString()}</div>
-        <div><strong>Total Outstanding:</strong> ₹${totalPending.toLocaleString()}</div>
-        <div><strong>60-90 Days OS:</strong> ₹${os60to90.toLocaleString()}</div>
-        <div><strong>90+ Days OS:</strong> <span class="danger">₹${os90.toLocaleString()}</span></div>
-        <div><strong>DSO:</strong> ${dso} Days</div>
-      `;
-    }
-
-    loadData();
-  </script>
+  <script src="script.js"></script>
 </body>
 </html>
